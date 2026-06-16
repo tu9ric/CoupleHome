@@ -1,0 +1,58 @@
+{% extends 'todo/main.html' %}
+
+{% block content %}
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span class="brand-mark">OH</span>
+            <div>
+                <strong>OurHome</strong>
+                <small>{{ ui.brand_subtitle }}</small>
+            </div>
+        </div>
+
+        {% if active_space %}
+            <div class="space-chip">
+                <span>{{ ui.space_label }}</span>
+                <strong>{{ active_space.name }}</strong>
+            </div>
+        {% endif %}
+
+        <nav class="sidebar-nav">
+            <a class="{% if active_nav == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                <span>{{ ui.nav_home }}</span>
+                <small>{{ ui.nav_home_hint }}</small>
+            </a>
+            <a class="{% if active_nav == 'todo' %}active{% endif %}" href="{% url 'task' %}">
+                <span>{{ ui.nav_todo }}</span>
+                <small>{{ ui.nav_todo_hint }}</small>
+            </a>
+            <a class="{% if active_nav == 'files' %}active{% endif %}" href="{% url 'files' %}">
+                <span>{{ ui.nav_files }}</span>
+                <small>{{ ui.nav_files_hint }}</small>
+            </a>
+            <a class="{% if active_nav == 'chat' %}active{% endif %}" href="{% url 'chat' %}">
+                <span>{{ ui.nav_chat }}</span>
+                <small>{{ ui.nav_chat_hint }}</small>
+            </a>
+            <a class="{% if active_nav == 'events' %}active{% endif %}" href="{% url 'events' %}">
+                <span>{{ ui.nav_dates }}</span>
+                <small>{{ ui.nav_dates_hint }}</small>
+            </a>
+            <a class="{% if active_nav == 'settings' %}active{% endif %}" href="{% url 'settings' %}">
+                <span>{{ ui.nav_settings }}</span>
+                <small>{{ ui.nav_settings_hint }}</small>
+            </a>
+        </nav>
+
+        <form class="sidebar-logout" action="{% url 'logout' %}" method="post">
+            {% csrf_token %}
+            <button type="submit">{{ ui.logout }}</button>
+        </form>
+    </aside>
+
+    <main class="app-main">
+        {% block app_content %}{% endblock app_content %}
+    </main>
+</div>
+{% endblock content %}

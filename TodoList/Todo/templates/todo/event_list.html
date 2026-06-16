@@ -1,0 +1,44 @@
+{% extends 'todo/app_shell.html' %}
+
+{% block app_content %}
+<section class="mode-header">
+    <div>
+        <p class="eyebrow">{{ ui.dates_eyebrow }}</p>
+        <h1>{{ ui.dates_title }}</h1>
+        <p>{{ ui.dates_description }}</p>
+    </div>
+    <a class="primary-action" href="{% url 'event-create' %}">{{ ui.add_date }}</a>
+</section>
+
+<div class="stats-grid app-stats two-stats">
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.upcoming }}</span>
+        <strong>{{ upcoming_count }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.all_saved }}</span>
+        <strong>{{ events|length }}</strong>
+    </div>
+</div>
+
+<section class="hub-panel">
+    <div class="event-timeline">
+        {% for event in events %}
+            <article class="event-row">
+                <time>{{ event.event_date|date:"M j" }}</time>
+                <div>
+                    <h3>{{ event.title }}</h3>
+                    {% if event.notes %}<p>{{ event.notes }}</p>{% endif %}
+                </div>
+                {% if event.remind %}<span class="category-pill">{{ ui.reminder }}</span>{% endif %}
+            </article>
+        {% empty %}
+            <div class="empty-state">
+                <h3>{{ ui.no_dates_yet }}</h3>
+                <p>{{ ui.add_first_date }}</p>
+                <a class="primary-action" href="{% url 'event-create' %}">{{ ui.add_date }}</a>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock app_content %}

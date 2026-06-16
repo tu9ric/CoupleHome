@@ -1,10 +1,36 @@
 from django.urls import path
-from .views import TaskList, TaskDetail, TaskCreate, TaskUpdate, TaskDelete, CustomLoginView, RegisterPage
+from .views import (
+    ChatMessageCreate,
+    ChatPage,
+    CoupleEventCreate,
+    CoupleEventList,
+    CustomLoginView,
+    DashboardView,
+    RegisterPage,
+    SettingsPage,
+    SharedFileCreate,
+    SharedFileList,
+    TaskCreate,
+    TaskDelete,
+    TaskDetail,
+    TaskList,
+    TaskUpdate,
+    download_shared_file,
+)
 from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
-    path('', TaskList.as_view(), name = "task"),
+    path('', DashboardView.as_view(), name='dashboard'),
+    path('todo/', TaskList.as_view(), name = "task"),
     path('task-create/', TaskCreate.as_view(), name = 'task-create'),
+    path('files/', SharedFileList.as_view(), name='files'),
+    path('files/upload/', SharedFileCreate.as_view(), name='file-upload'),
+    path('files/<int:pk>/download/', download_shared_file, name='file-download'),
+    path('events/', CoupleEventList.as_view(), name='events'),
+    path('events/create/', CoupleEventCreate.as_view(), name='event-create'),
+    path('chat/', ChatPage.as_view(), name='chat'),
+    path('chat/send/', ChatMessageCreate.as_view(), name='chat-send'),
+    path('settings/', SettingsPage.as_view(), name='settings'),
     path('login/', CustomLoginView.as_view(), name = 'login'),
     path('logout/', LogoutView.as_view(next_page='login'), name = 'logout'),
     path('register/', RegisterPage.as_view(), name = 'register'),

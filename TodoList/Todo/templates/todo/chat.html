@@ -1,0 +1,34 @@
+{% extends 'todo/app_shell.html' %}
+
+{% block app_content %}
+<section class="mode-header">
+    <div>
+        <p class="eyebrow">{{ ui.chat_eyebrow }}</p>
+        <h1>{{ ui.chat_title }}</h1>
+        <p>{{ ui.chat_description }}</p>
+    </div>
+</section>
+
+<section class="hub-panel chat-mode-panel">
+    <div class="chat-feed full-chat-feed">
+        {% for message in chat_messages %}
+            <div class="chat-bubble">
+                <strong>{{ message.user|title }}</strong>
+                <p>{{ message.message }}</p>
+                <small>{{ message.created|date:"M j, H:i" }}</small>
+            </div>
+        {% empty %}
+            <div class="empty-state">
+                <h3>{{ ui.no_messages_yet }}</h3>
+                <p>{{ ui.start_chat }}</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-form chat-compose" action="{% url 'chat-send' %}" method="post">
+        {% csrf_token %}
+        {{ chat_form.message }}
+        <button class="button" type="submit">{{ ui.send }}</button>
+    </form>
+</section>
+{% endblock app_content %}

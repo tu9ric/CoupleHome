@@ -1,0 +1,125 @@
+{% extends 'todo/app_shell.html' %}
+
+{% block app_content %}
+<section class="mode-header">
+    <div>
+        <p class="eyebrow">{{ ui.settings_eyebrow }}</p>
+        <h1>{{ ui.settings_title }}</h1>
+        <p>{{ ui.settings_description }}</p>
+    </div>
+</section>
+
+<section class="hub-panel settings-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">{{ ui.group_mode }}</p>
+            <h2>{{ ui.shared_space }}</h2>
+            <p class="muted-text">{{ ui.shared_space_description }}</p>
+        </div>
+    </div>
+
+    <div class="settings-form">
+        <div class="settings-group">
+            <div>
+                <h2>{{ ui.active_space }}</h2>
+                <p class="muted-text">{{ ui.active_space_description }}</p>
+            </div>
+            <form action="{% url 'settings' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="settings_action" value="switch_space">
+                <select name="space_id" onchange="this.form.submit()">
+                    {% for space in spaces %}
+                        <option value="{{ space.id }}" {% if active_space.id == space.id %}selected{% endif %}>{{ space.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+
+        <div class="settings-group">
+            <div>
+                <h2>{{ ui.members }}</h2>
+                <p class="muted-text">{{ ui.members_description }}</p>
+            </div>
+            <div class="member-list">
+                {% for member in members %}
+                    <span>{{ member.username }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div>
+                <h2>{{ ui.add_user }}</h2>
+                <p class="muted-text">{{ ui.add_user_description }}</p>
+            </div>
+            <form class="inline-settings-form" action="{% url 'settings' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="settings_action" value="add_member">
+                {{ member_form.username }}
+                <button class="button" type="submit">{{ ui.add }}</button>
+            </form>
+        </div>
+
+        <div class="settings-group">
+            <div>
+                <h2>{{ ui.create_space }}</h2>
+                <p class="muted-text">{{ ui.create_space_description }}</p>
+            </div>
+            <form class="inline-settings-form" action="{% url 'settings' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="settings_action" value="create_space">
+                {{ space_form.name }}
+                <button class="button" type="submit">{{ ui.create }}</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="hub-panel settings-panel">
+    <form class="settings-form" action="{% url 'settings' %}" method="post" data-autosubmit-settings>
+        {% csrf_token %}
+        <input type="hidden" name="settings_action" value="preferences">
+
+        <div class="settings-group">
+            <div>
+                <h2>{{ ui.theme_title }}</h2>
+                <p class="muted-text">{{ ui.theme_description }}</p>
+            </div>
+            <div class="segmented-control">
+                <label class="{% if theme == 'light' %}selected{% endif %}">
+                    <input type="radio" name="theme" value="light" {% if theme == 'light' %}checked{% endif %}>
+                    {{ ui.theme_light }}
+                </label>
+                <label class="{% if theme == 'dark' %}selected{% endif %}">
+                    <input type="radio" name="theme" value="dark" {% if theme == 'dark' %}checked{% endif %}>
+                    {{ ui.theme_dark }}
+                </label>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div>
+                <h2>{{ ui.language_title }}</h2>
+                <p class="muted-text">{{ ui.language_description }}</p>
+            </div>
+            <select name="language">
+                <option value="en" {% if language == 'en' %}selected{% endif %}>English</option>
+                <option value="ru" {% if language == 'ru' %}selected{% endif %}>Русский</option>
+            </select>
+        </div>
+
+        <noscript>
+            <button class="button" type="submit">{{ ui.save_settings }}</button>
+        </noscript>
+    </form>
+</section>
+
+<script>
+    const settingsForm = document.querySelector('[data-autosubmit-settings]');
+    if (settingsForm) {
+        settingsForm.addEventListener('change', () => {
+            settingsForm.requestSubmit();
+        });
+    }
+</script>
+{% endblock app_content %}

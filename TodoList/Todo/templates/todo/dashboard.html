@@ -1,0 +1,116 @@
+{% extends 'todo/app_shell.html' %}
+
+{% block app_content %}
+<section class="mode-header">
+    <div>
+        <p class="eyebrow">{{ ui.dashboard_eyebrow }}</p>
+        <h1>{{ ui.dashboard_title }}, {{ request.user|title }}</h1>
+        <p>{{ ui.dashboard_description }}</p>
+    </div>
+    <div class="mode-actions">
+        <a class="primary-action" href="{% url 'task-create' %}">{{ ui.new_task }}</a>
+        <a class="secondary-action" href="{% url 'file-upload' %}">{{ ui.upload_file }}</a>
+    </div>
+</section>
+
+<div class="stats-grid app-stats">
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.open_tasks }}</span>
+        <strong>{{ count }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.completed }}</span>
+        <strong>{{ completed_count }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.files }}</span>
+        <strong>{{ file_count }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.upcoming }}</span>
+        <strong>{{ event_count }}</strong>
+    </div>
+</div>
+
+<div class="mode-grid">
+    <section class="hub-panel">
+        <div class="panel-heading compact">
+            <div>
+                <p class="eyebrow">{{ ui.question }}</p>
+                <h2>{{ ui.today }}</h2>
+            </div>
+        </div>
+        <div class="question-card">
+            <p>{{ question_prompt }}</p>
+            <small>{{ ui.answer_in_chat }}</small>
+        </div>
+    </section>
+
+    <section class="hub-panel">
+        <div class="panel-heading compact">
+            <div>
+                <p class="eyebrow">{{ ui.files }}</p>
+                <h2>{{ ui.favorites }}</h2>
+            </div>
+            <a class="mini-action" href="{% url 'files' %}">{{ ui.open }}</a>
+        </div>
+        <div class="mini-list">
+            {% for file in favorite_files %}
+                <a class="mini-item" href="{% url 'file-download' file.id %}">
+                    <span>
+                        <strong>{{ file.title }}</strong>
+                        <small>{{ file.get_category_display }} / {{ file.size|filesizeformat }}</small>
+                    </span>
+                    <em>{{ ui.download }}</em>
+                </a>
+            {% empty %}
+                <p class="muted-text">{{ ui.favorite_files_empty }}</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="hub-panel">
+        <div class="panel-heading compact">
+            <div>
+                <p class="eyebrow">{{ ui.dates_eyebrow }}</p>
+                <h2>{{ ui.upcoming }}</h2>
+            </div>
+            <a class="mini-action" href="{% url 'events' %}">{{ ui.open }}</a>
+        </div>
+        <div class="mini-list">
+            {% for event in events %}
+                <div class="mini-item">
+                    <span>
+                        <strong>{{ event.title }}</strong>
+                        <small>{{ event.event_date|date:"M j, Y" }}</small>
+                    </span>
+                    {% if event.remind %}<em>{{ ui.reminder }}</em>{% endif %}
+                </div>
+            {% empty %}
+                <p class="muted-text">{{ ui.events_empty_short }}</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="hub-panel">
+        <div class="panel-heading compact">
+            <div>
+                <p class="eyebrow">{{ ui.chat_eyebrow }}</p>
+                <h2>{{ ui.latest_notes }}</h2>
+            </div>
+            <a class="mini-action" href="{% url 'chat' %}">{{ ui.open }}</a>
+        </div>
+        <div class="chat-feed compact-feed">
+            {% for message in chat_messages %}
+                <div class="chat-bubble">
+                    <strong>{{ message.user|title }}</strong>
+                    <p>{{ message.message }}</p>
+                    <small>{{ message.created|date:"M j, H:i" }}</small>
+                </div>
+            {% empty %}
+                <p class="muted-text">{{ ui.no_notes }}</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock app_content %}

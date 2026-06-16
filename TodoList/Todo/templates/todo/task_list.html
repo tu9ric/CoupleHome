@@ -1,73 +1,99 @@
-{% extends 'todo/main.html' %}
-{% block content %}
+{% extends 'todo/app_shell.html' %}
 
-<div class="header-bar">
+{% block app_content %}
+<section class="mode-header">
     <div>
-        <h1>Hello, {{ request.user | title }}</h1>
-        <h3>You have <i> {{ count }} incomplete task{{count|pluralize:'s'}} </i></h3>
+        <p class="eyebrow">{{ ui.todo_eyebrow }}</p>
+        <h1>{{ ui.todo_title }}</h1>
+        <p>{{ ui.todo_description }}</p>
     </div>
-    <form action="{% url 'logout' %}" method="post">
-        {% csrf_token %}
-        <button class="link-button" type="submit">Logout</button>
-    </form>
-</div>
-<hr>
+    <a class="primary-action" href="{% url 'task-create' %}">{{ ui.new_task }}</a>
+</section>
 
-<div id="search-and-wrapper">
-    <form action="" method="get">
-        <input type="text" name="search-area" value="{{ search_input }}" placeholder="Search task">
-        <input class="button" type="submit" value="Search Task">
-    </form>
-    <a id="add-link" href="{% url 'task-create' %}">&#x2b;</a>
-</div>
-
-
-
-
-<div class = "task-item-wrapper">
-    {% for tasks in task %}
-    <div class = "task-wrapper">
-        {% if tasks.complete %}
-        <div class="task-title">
-            <div class="task-complete-icon"></div>
-            <i><s><a href="{% url 'task-update' tasks.id %}">{{ tasks }}</a></s></i>
-        </div>
-        <a href="{% url 'task-delete' tasks.id %}" class="delete-link">&#215;</a>
-
-        {% else %}
-        <div class="task-title">
-            <div class="task-incomplete-icon"></div>
-            <a href="{% url 'task-update' tasks.id %}">{{ tasks }}</a>
-        </div>
-        <a href="{% url 'task-delete' tasks.id %}" class="delete-link">&#215;</a>
-        {% endif %}
+<div class="stats-grid app-stats">
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.stat_open }}</span>
+        <strong>{{ count }}</strong>
     </div>
-    {% empty %}
-    <h3>No items in list </h3>
-    <a class = "button" href="{% url 'task-create' %}">Add new item</a>
-    {% endfor %}
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.completed }}</span>
+        <strong>{{ completed_count }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.stat_total }}</span>
+        <strong>{{ total_count }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.stat_showing }}</span>
+        <strong>{{ visible_count }}</strong>
+    </div>
 </div>
 
+<section class="hub-panel">
+    <form class="filter-panel inline-filter" action="" method="get">
+        <label class="search-field">
+            <span>{{ ui.search }}</span>
+            <input type="text" name="search-area" value="{{ search_input }}" placeholder="{{ ui.task_title_placeholder }}">
+        </label>
 
-<!--
-<table>
-    <tr>
-        <th>Items</th>
-    </tr>
-    {% for task in task %}
-    <tr>
-        <td> {{task.title}}</td>
-        <td><a href="{% url 'task-detail' task.id %}">View</a></td>
-        <td><a href="{% url 'task-update' task.id %}">Edit</a></td>
-        <td><a href="{% url 'task-create' %}">Add</a></td>
-        <td><a href="{% url 'task-delete' task.id %}">Delete</a></td>
-    </tr>
-    {% empty %}
-    <h3>No items in list </h3>
-    <a href="{% url 'task-create' %}">Add new item</a>
-    {% endfor %}
-</table>
--->
+        <label>
+            <span>{{ ui.status }}</span>
+            <select name="status">
+                <option value="" {% if not status_filter %}selected{% endif %}>{{ ui.all_tasks }}</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{{ ui.open_only }}</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>{{ ui.completed_only }}</option>
+            </select>
+        </label>
 
+        <label>
+            <span>{{ ui.area }}</span>
+            <select name="category">
+                <option value="" {% if not category_filter %}selected{% endif %}>{{ ui.all_areas }}</option>
+                {% for category in categories %}
+                    <option value="{{ category }}" {% if category_filter == category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
+        </label>
 
-{% endblock content %}
+        <div class="filter-actions">
+            <button class="button" type="submit">{{ ui.apply }}</button>
+            <a class="muted-action" href="{% url 'task' %}">{{ ui.reset }}</a>
+        </div>
+    </form>
+
+    <div class="task-grid app-task-grid">
+        {% for tasks in task %}
+            <article class="task-card {% if tasks.complete %}task-card-complete{% endif %}">
+                <div class="task-status">
+                    <span class="{% if tasks.complete %}status-dot-complete{% else %}status-dot-active{% endif %}"></span>
+                    {% if tasks.complete %}{{ ui.done }}{% else %}{{ ui.open }}{% endif %}
+                </div>
+                <h3><a href="{% url 'task-detail' tasks.id %}">{{ tasks }}</a></h3>
+                {% if tasks.description %}
+                    <p>{{ tasks.description|truncatechars:140 }}</p>
+                {% else %}
+                    <p class="muted-text">{{ ui.no_details }}</p>
+                {% endif %}
+                <div class="task-meta">
+                    {% if tasks.category %}
+                        <span class="category-pill">{{ tasks.category }}</span>
+                    {% else %}
+                        <span class="category-pill muted-pill">{{ ui.general }}</span>
+                    {% endif %}
+                    <span>{{ tasks.created|date:"M j" }}</span>
+                </div>
+                <div class="task-actions">
+                    <a href="{% url 'task-update' tasks.id %}">{{ ui.edit }}</a>
+                    <a class="danger-link" href="{% url 'task-delete' tasks.id %}">{{ ui.delete }}</a>
+                </div>
+            </article>
+        {% empty %}
+            <div class="empty-state">
+                <h3>{{ ui.no_tasks_found }}</h3>
+                <p>{{ ui.create_first_task }}</p>
+                <a class="primary-action" href="{% url 'task-create' %}">{{ ui.create_task }}</a>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock app_content %}

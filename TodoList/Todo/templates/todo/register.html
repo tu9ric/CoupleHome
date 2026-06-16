@@ -8,16 +8,23 @@
     <form action="" method = "post" >
         {% csrf_token %}
 
-        <!--{{ form.as_p }}-->
+        {% if form.non_field_errors %}
+            <div class="form-errors">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
 
         <label>{{ form.username.label }}</label>
         {{ form.username }}
+        {{ form.username.errors }}
 
         <label>{{ form.password1.label }}</label>
         {{ form.password1 }}
+        {{ form.password1.errors }}
 
         <label>{{ form.password2.label }}</label>
         {{ form.password2 }}
+        {{ form.password2.errors }}
 
         <br> <br>
         <input class = "button" type="submit" value="Register new account">

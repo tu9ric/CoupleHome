@@ -1,0 +1,19 @@
+{% extends 'todo/main.html' %}
+
+{% block content %}
+<div class="form-page">
+    <div class="header-bar">
+        <a href="{% url 'files' %}">&#8592; Back to Files</a>
+    </div>
+
+    <div class="card-body">
+        <h1>Upload shared file</h1>
+        <p class="muted-text">Files are stored in the database and limited to 50 MB.</p>
+        <form action="" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <input class="button" type="submit" value="Save file">
+        </form>
+    </div>
+</div>
+{% endblock content %}

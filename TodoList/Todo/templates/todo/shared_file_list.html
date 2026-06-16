@@ -1,0 +1,69 @@
+{% extends 'todo/app_shell.html' %}
+
+{% block app_content %}
+<section class="mode-header">
+    <div>
+        <p class="eyebrow">{{ ui.files_eyebrow }}</p>
+        <h1>{{ ui.files_title }}</h1>
+        <p>{{ ui.files_description }}</p>
+    </div>
+    <a class="primary-action" href="{% url 'file-upload' %}">{{ ui.upload_file }}</a>
+</section>
+
+<div class="stats-grid app-stats two-stats">
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.all_files }}</span>
+        <strong>{{ file_count }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">{{ ui.favorites }}</span>
+        <strong>{{ favorite_count }}</strong>
+    </div>
+</div>
+
+<section class="hub-panel">
+    <form class="filter-panel files-filter" action="" method="get">
+        <label>
+            <span>{{ ui.category }}</span>
+            <select name="category">
+                <option value="" {% if not category_filter %}selected{% endif %}>{{ ui.all_files }}</option>
+                {% for value, label in file_categories %}
+                    <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            <span>{{ ui.favorites }}</span>
+            <select name="favorite">
+                <option value="" {% if not favorite_filter %}selected{% endif %}>{{ ui.everything }}</option>
+                <option value="1" {% if favorite_filter == '1' %}selected{% endif %}>{{ ui.favorites_only }}</option>
+            </select>
+        </label>
+        <div class="filter-actions">
+            <button class="button" type="submit">{{ ui.apply }}</button>
+            <a class="muted-action" href="{% url 'files' %}">{{ ui.reset }}</a>
+        </div>
+    </form>
+
+    <div class="file-grid">
+        {% for file in files %}
+            <article class="file-card">
+                <div>
+                    <span class="category-pill">{{ file.get_category_display }}</span>
+                    {% if file.favorite %}<span class="category-pill favorite-pill">{{ ui.favorite }}</span>{% endif %}
+                </div>
+                <h3>{{ file.title }}</h3>
+                <p>{{ file.file_name }} / {{ file.size|filesizeformat }}</p>
+                {% if file.note %}<p>{{ file.note|truncatechars:120 }}</p>{% endif %}
+                <a class="primary-action" href="{% url 'file-download' file.id %}">{{ ui.download }}</a>
+            </article>
+        {% empty %}
+            <div class="empty-state">
+                <h3>{{ ui.no_files_yet }}</h3>
+                <p>{{ ui.upload_first_file }}</p>
+                <a class="primary-action" href="{% url 'file-upload' %}">{{ ui.upload_file }}</a>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock app_content %}
