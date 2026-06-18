@@ -10,6 +10,7 @@ const messageInput = document.querySelector('textarea[name="message"]');
     const attachFileButton = document.querySelector('[data-attach-file]');
     const selectedFile = document.querySelector('[data-selected-file]');
     const chatForm = document.querySelector('.chat-compose');
+    const chatSendButton = document.querySelector('.chat-send-button');
     const recordVoiceButton = document.querySelector('[data-record-voice]');
     const recordCircleButton = document.querySelector('[data-record-circle]');
     const recordStatus = document.querySelector('[data-record-status]');
@@ -83,6 +84,11 @@ const messageInput = document.querySelector('textarea[name="message"]');
     scrollChatToBottom();
     resizeMessageInput();
     messageInput?.addEventListener('input', resizeMessageInput);
+    chatSendButton?.addEventListener('pointerdown', (event) => {
+        if (document.activeElement === messageInput) {
+            event.preventDefault();
+        }
+    });
     messageInput?.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && !messageMenu?.hidden) {
             event.preventDefault();
@@ -193,6 +199,10 @@ const messageInput = document.querySelector('textarea[name="message"]');
     chatFeed?.addEventListener('click', (event) => {
         const videoButton = event.target.closest('.video-circle-trigger');
         if (videoButton && floatingVideo && floatingVideoTag) {
+            if (suppressMediaClick) {
+                event.preventDefault();
+                return;
+            }
             floatingVideoTag.src = videoButton.dataset.videoSrc;
             floatingVideo.hidden = false;
             floatingVideoTag.play();
@@ -356,6 +366,12 @@ const messageInput = document.querySelector('textarea[name="message"]');
     }
 
     function bindHoldToRecord(button, kind) {
+        button?.addEventListener('selectstart', (event) => event.preventDefault());
+        button?.addEventListener('dragstart', (event) => event.preventDefault());
+        button?.addEventListener('touchstart', (event) => {
+            event.preventDefault();
+        }, { passive: false });
+
         button?.addEventListener('pointerdown', (event) => {
             event.preventDefault();
             if (activeRecordingPointerId !== null) return;
@@ -511,7 +527,7 @@ const messageInput = document.querySelector('textarea[name="message"]');
         });
     }
 
-    function resetComposer() {
+    function resetComposer({ keepFocus = false } = {}) {
         if (messageInput) messageInput.value = '';
         if (uploadInput) uploadInput.value = '';
         if (attachmentTypeInput) attachmentTypeInput.value = 'text';
@@ -520,6 +536,9 @@ const messageInput = document.querySelector('textarea[name="message"]');
         clearReply();
         resizeMessageInput();
         if (recordStatus) recordStatus.textContent = '';
+        if (keepFocus) {
+            messageInput?.focus({ preventScroll: true });
+        }
     }
 
     function selectReply(message) {
@@ -648,9 +667,12 @@ const messageInput = document.querySelector('textarea[name="message"]');
     let swipedMessage = null;
     let swipeStartX = 0;
     let swipeStartY = 0;
+    let suppressMediaClick = false;
 
     chatFeed?.addEventListener('pointerdown', (event) => {
-        if (event.target.closest('a, button, audio, video')) return;
+        const interactiveTarget = event.target.closest('a, button, audio, video');
+        const videoCircle = event.target.closest('.video-circle-trigger');
+        if (interactiveTarget && !videoCircle) return;
         swipedMessage = event.target.closest('[data-message-id]');
         if (!swipedMessage) return;
         swipeStartX = event.clientX;
@@ -684,7 +706,13 @@ const messageInput = document.querySelector('textarea[name="message"]');
             : deltaX;
         message.style.removeProperty('transform');
         swipedMessage = null;
-        if (distance >= 70) selectReply(message);
+        if (distance >= 70) {
+            suppressMediaClick = true;
+            selectReply(message);
+            window.setTimeout(() => {
+                suppressMediaClick = false;
+            }, 350);
+        }
     }
 
     chatFeed?.addEventListener('pointerup', finishReplySwipe);
@@ -711,7 +739,7 @@ const messageInput = document.querySelector('textarea[name="message"]');
         }
         const data = await response.json();
         appendMessages([{ id: data.id, html: data.html, is_own: true }]);
-        resetComposer();
+        resetComposer({ keepFocus: true });
     });
 
     formatLocalTimes();

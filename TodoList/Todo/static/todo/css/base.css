@@ -784,6 +784,21 @@
         width: 42px;
     }
 
+    .record-voice-button,
+    .record-circle-button {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        user-select: none;
+    }
+
+    .record-voice-button *,
+    .record-circle-button * {
+        -webkit-user-select: none;
+        pointer-events: none;
+        user-select: none;
+    }
+
     .chat-send-button {
         background: #2f6f73;
         border-color: #2f6f73;
