@@ -1,4 +1,5 @@
 {% extends 'todo/app_shell.html' %}
+{% load static %}
 
 {% block app_content %}
 <section class="mode-header chat-mode-header">
@@ -12,32 +13,17 @@
     </button>
 </section>
 
-<section class="hub-panel chat-mode-panel" data-latest-message-id="{{ latest_chat_message_id }}" data-notification-url="{% url 'chat-notifications' %}">
+<section
+    class="hub-panel chat-mode-panel"
+    data-chat-url="{% url 'chat' %}"
+    data-updates-url="{% url 'chat-updates' %}"
+    data-latest-message-id="{{ latest_chat_message_id }}"
+    data-notification-url="{% url 'chat-notifications' %}"
+    data-notifications-enabled="{{ ui.notifications_enabled }}"
+>
     <div class="chat-feed full-chat-feed">
         {% for message in chat_messages %}
-            <div class="chat-bubble {% if message.user == request.user %}chat-bubble-own{% else %}chat-bubble-partner{% endif %}">
-                <strong>{{ message.user|title }}</strong>
-                {% if message.display_message %}<p>{{ message.display_message }}</p>{% endif %}
-                {% if message.data and message.attachment_type == 'photo' %}
-                    <img class="chat-photo" src="{% url 'chat-attachment' message.id %}" alt="{{ message.file_name }}">
-                {% elif message.data and message.attachment_type == 'voice' %}
-                    <audio class="chat-audio" controls src="{% url 'chat-attachment' message.id %}"></audio>
-                {% elif message.data and message.attachment_type == 'video_circle' %}
-                    <button class="video-circle-trigger" type="button" data-video-src="{% url 'chat-attachment' message.id %}">
-                        <video muted playsinline preload="metadata" src="{% url 'chat-attachment' message.id %}"></video>
-                        <span>Play</span>
-                    </button>
-                {% endif %}
-                <small>{{ message.created|date:"M j, H:i" }}</small>
-                {% if message.user == request.user %}
-                    <div class="message-actions">
-                        {% if message.display_message %}
-                            <a href="{% url 'chat-message-edit' message.id %}">{{ ui.edit }}</a>
-                        {% endif %}
-                        <a class="danger-link" href="{% url 'chat-message-delete' message.id %}">{{ ui.delete }}</a>
-                    </div>
-                {% endif %}
-            </div>
+            {% include 'todo/_chat_message.html' %}
         {% empty %}
             <div class="empty-state">
                 <h3>{{ ui.no_messages_yet }}</h3>
@@ -49,6 +35,14 @@
     <form class="chat-form chat-compose" action="{% url 'chat-send' %}" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {{ chat_form.attachment_type }}
+        {{ chat_form.reply_to }}
+        <div class="chat-reply-preview" data-reply-preview hidden>
+            <div>
+                <strong data-reply-author></strong>
+                <span data-reply-text></span>
+            </div>
+            <button type="button" data-cancel-reply aria-label="Cancel reply">&times;</button>
+        </div>
         <div class="chat-compose-row">
             <button class="chat-icon-button" type="button" data-attach-file aria-label="Attach file" title="Attach file">
                 <span aria-hidden="true">&#128206;</span>
@@ -77,366 +71,24 @@
 <div class="circle-record-preview" data-circle-preview hidden>
     <video muted autoplay playsinline></video>
     <div class="circle-cancel-hint" data-circle-cancel-hint>
-        <span aria-hidden="true">←</span>
+        <span aria-hidden="true">&larr;</span>
         <strong>Slide left to cancel</strong>
     </div>
 </div>
 
 <div class="floating-video-circle" hidden>
     <video controls autoplay playsinline></video>
-    <button type="button" aria-label="Close video">×</button>
+    <button type="button" aria-label="Close video">&times;</button>
 </div>
 
-<script>
-    const messageInput = document.querySelector('textarea[name="message"]');
-    const attachmentTypeInput = document.querySelector('input[name="attachment_type"]');
-    const uploadWrap = document.querySelector('[data-chat-upload]');
-    const uploadInput = document.querySelector('input[name="upload"]');
-    const attachFileButton = document.querySelector('[data-attach-file]');
-    const selectedFile = document.querySelector('[data-selected-file]');
-    const chatForm = document.querySelector('.chat-compose');
-    const recordVoiceButton = document.querySelector('[data-record-voice]');
-    const recordCircleButton = document.querySelector('[data-record-circle]');
-    const recordStatus = document.querySelector('[data-record-status]');
-    const circlePreview = document.querySelector('[data-circle-preview]');
-    const circlePreviewVideo = circlePreview?.querySelector('video');
-    const circleCancelHint = document.querySelector('[data-circle-cancel-hint]');
-    const notificationsButton = document.querySelector('[data-enable-notifications]');
-    const chatPanel = document.querySelector('[data-latest-message-id]');
-    let latestMessageId = Number(chatPanel?.dataset.latestMessageId || 0);
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let recordingStream = null;
-    let recordingKind = null;
-    let requestedRecordingKind = null;
-    let recordingStartedAt = 0;
-    let discardRecording = false;
-    let cancelRecording = false;
-    let activeRecordingPointerId = null;
-    let recordingPointerStartX = 0;
-    const cancelSwipeDeadZone = 24;
+<div class="message-context-menu" data-message-menu hidden role="menu">
+    <a data-menu-edit role="menuitem">{{ ui.edit }}</a>
+    <a class="danger-link" data-menu-delete role="menuitem">{{ ui.delete }}</a>
+</div>
 
-    function getCancelSwipeDistance() {
-        return Math.max(150, Math.min(window.innerWidth * 0.48, 260));
-    }
-
-    function updateChatViewport() {
-        if (window.innerWidth > 820) return;
-        const viewportHeight = window.visualViewport?.height || window.innerHeight;
-        document.documentElement.style.setProperty('--chat-viewport-height', `${viewportHeight}px`);
-    }
-
-    function scrollChatToBottom() {
-        const feed = document.querySelector('.full-chat-feed');
-        if (feed) feed.scrollTop = feed.scrollHeight;
-    }
-
-    function resizeMessageInput() {
-        if (!messageInput) return;
-        messageInput.style.height = '38px';
-        messageInput.style.height = `${Math.min(messageInput.scrollHeight, 104)}px`;
-    }
-
-    updateChatViewport();
-    scrollChatToBottom();
-    resizeMessageInput();
-    messageInput?.addEventListener('input', resizeMessageInput);
-    window.visualViewport?.addEventListener('resize', updateChatViewport);
-    window.addEventListener('orientationchange', () => {
-        window.setTimeout(() => {
-            updateChatViewport();
-            scrollChatToBottom();
-        }, 150);
-    });
-
-    function updateNotificationsButton() {
-        if (!notificationsButton || !('Notification' in window)) return;
-        if (Notification.permission === 'granted') {
-            notificationsButton.textContent = '{{ ui.notifications_enabled|escapejs }}';
-            notificationsButton.disabled = true;
-        }
-    }
-
-    async function requestNotifications() {
-        if (!('Notification' in window)) return;
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') updateNotificationsButton();
-    }
-
-    async function pollChatNotifications() {
-        if (!chatPanel || !('Notification' in window) || Notification.permission !== 'granted') return;
-
-        const url = `${chatPanel.dataset.notificationUrl}?after=${latestMessageId}`;
-        const response = await fetch(url, {
-            credentials: 'same-origin',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        });
-        if (!response.ok) return;
-
-        const data = await response.json();
-        latestMessageId = Number(data.latest_id || latestMessageId);
-        (data.messages || []).forEach((message) => {
-            const notification = new Notification(`OurHome: ${message.author}`, {
-                body: message.message || 'New message',
-                tag: `ourhome-chat-${message.id}`,
-            });
-            notification.onclick = () => {
-                window.focus();
-                window.location.href = '{% url "chat" %}';
-                notification.close();
-            };
-        });
-    }
-
-    notificationsButton?.addEventListener('click', requestNotifications);
-    updateNotificationsButton();
-    window.setInterval(pollChatNotifications, 5000);
-
-    if (attachmentTypeInput && !attachmentTypeInput.value) {
-        attachmentTypeInput.value = 'text';
-    }
-
-    attachFileButton?.addEventListener('click', () => uploadInput?.click());
-
-    uploadInput?.addEventListener('change', () => {
-        const file = uploadInput.files?.[0];
-        if (!file) return;
-
-        let attachmentType = '';
-        if (file.type.startsWith('image/')) attachmentType = 'photo';
-        if (file.type.startsWith('audio/')) attachmentType = 'voice';
-        if (file.type.startsWith('video/')) attachmentType = 'video_circle';
-
-        if (!attachmentType) {
-            uploadInput.value = '';
-            if (recordStatus) recordStatus.textContent = 'Choose a photo, audio, or video file.';
-            return;
-        }
-
-        if (attachmentTypeInput) attachmentTypeInput.value = attachmentType;
-        if (uploadWrap) uploadWrap.hidden = false;
-        if (selectedFile) selectedFile.textContent = file.name;
-        if (recordStatus) recordStatus.textContent = '';
-    });
-
-    const floatingVideo = document.querySelector('.floating-video-circle');
-    const floatingVideoTag = floatingVideo?.querySelector('video');
-    const closeFloatingVideo = floatingVideo?.querySelector('button');
-
-    document.querySelectorAll('.video-circle-trigger').forEach((button) => {
-        button.addEventListener('click', () => {
-            if (!floatingVideo || !floatingVideoTag) return;
-            floatingVideoTag.src = button.dataset.videoSrc;
-            floatingVideo.hidden = false;
-            floatingVideoTag.play();
-        });
-    });
-
-    closeFloatingVideo?.addEventListener('click', () => {
-        if (!floatingVideo || !floatingVideoTag) return;
-        floatingVideoTag.pause();
-        floatingVideoTag.removeAttribute('src');
-        floatingVideo.hidden = true;
-    });
-
-    async function startRecording(kind) {
-        if (!navigator.mediaDevices || !window.MediaRecorder || mediaRecorder?.state === 'recording') {
-            if (recordStatus) recordStatus.textContent = 'Recording is not available in this browser.';
-            return;
-        }
-
-        try {
-            recordingKind = kind;
-            const constraints = kind === 'voice'
-                ? { audio: true }
-                : { video: { facingMode: 'user' }, audio: true };
-            recordingStream = await navigator.mediaDevices.getUserMedia(constraints);
-            if (requestedRecordingKind !== kind) {
-                recordingStream.getTracks().forEach((track) => track.stop());
-                recordingStream = null;
-                recordingKind = null;
-                if (recordStatus) recordStatus.textContent = 'Permission granted. Hold the button again to record.';
-                return;
-            }
-            recordedChunks = [];
-            const preferredMimeType = kind === 'voice' ? 'audio/webm' : 'video/webm';
-            const options = MediaRecorder.isTypeSupported(preferredMimeType)
-                ? { mimeType: preferredMimeType }
-                : {};
-            mediaRecorder = new MediaRecorder(recordingStream, options);
-            mediaRecorder.addEventListener('dataavailable', (event) => {
-                if (event.data.size > 0) recordedChunks.push(event.data);
-            });
-            mediaRecorder.addEventListener('stop', sendRecordedMedia);
-            mediaRecorder.start();
-            recordingStartedAt = Date.now();
-            discardRecording = false;
-            cancelRecording = false;
-
-            const activeButton = kind === 'voice' ? recordVoiceButton : recordCircleButton;
-            activeButton?.classList.add('recording');
-            if (recordStatus) {
-                recordStatus.textContent = kind === 'voice'
-                    ? 'Recording voice... release to send'
-                    : 'Recording circle... release to send';
-            }
-
-            if (kind === 'video_circle' && circlePreview && circlePreviewVideo) {
-                circlePreviewVideo.srcObject = recordingStream;
-                circlePreview.hidden = false;
-                circlePreview.style.setProperty('--cancel-progress', '0');
-                circlePreview.style.setProperty('--preview-shift', '0px');
-            }
-        } catch (error) {
-            recordingKind = null;
-            if (recordStatus) {
-                recordStatus.textContent = kind === 'voice'
-                    ? 'Microphone access was denied.'
-                    : 'Camera or microphone access was denied.';
-            }
-        }
-    }
-
-    function stopRecording({ cancel = false } = {}) {
-        requestedRecordingKind = null;
-        if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
-        cancelRecording = cancel;
-        discardRecording = cancel || Date.now() - recordingStartedAt < 600;
-        mediaRecorder.stop();
-        recordVoiceButton?.classList.remove('recording');
-        recordCircleButton?.classList.remove('recording');
-        if (recordingStream) {
-            recordingStream.getTracks().forEach((track) => track.stop());
-            recordingStream = null;
-        }
-        if (circlePreviewVideo) circlePreviewVideo.srcObject = null;
-        if (circlePreview) {
-            circlePreview.hidden = true;
-            circlePreview.style.removeProperty('--cancel-progress');
-            circlePreview.style.removeProperty('--preview-shift');
-        }
-    }
-
-    async function sendRecordedMedia() {
-        if (discardRecording) {
-            recordedChunks = [];
-            recordingKind = null;
-            discardRecording = false;
-            if (recordStatus) {
-                recordStatus.textContent = cancelRecording
-                    ? 'Recording canceled.'
-                    : 'Hold the button to record.';
-            }
-            cancelRecording = false;
-            return;
-        }
-
-        if (!chatForm || recordedChunks.length === 0) {
-            if (recordStatus) recordStatus.textContent = '';
-            recordingKind = null;
-            return;
-        }
-
-        const kind = recordingKind;
-        const mimeType = mediaRecorder?.mimeType || (kind === 'voice' ? 'audio/webm' : 'video/webm');
-        const extension = mimeType.includes('ogg') ? 'ogg' : 'webm';
-        const blob = new Blob(recordedChunks, { type: mimeType });
-        const formData = new FormData(chatForm);
-        formData.set('attachment_type', kind);
-        formData.set('message', messageInput?.value || '');
-        formData.set('upload', blob, `${kind}-${Date.now()}.${extension}`);
-
-        if (recordStatus) recordStatus.textContent = 'Sending...';
-
-        try {
-            const response = await fetch(chatForm.action, {
-                method: 'POST',
-                body: formData,
-                credentials: 'same-origin',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            });
-
-            if (response.ok || response.redirected) {
-                window.location.href = response.url || chatForm.action.replace('/send/', '/');
-            } else if (recordStatus) {
-                recordStatus.textContent = 'Could not send recording.';
-            }
-        } finally {
-            recordingKind = null;
-            cancelRecording = false;
-        }
-    }
-
-    function bindHoldToRecord(button, kind) {
-        button?.addEventListener('pointerdown', (event) => {
-            event.preventDefault();
-            if (activeRecordingPointerId !== null) return;
-            activeRecordingPointerId = event.pointerId;
-            recordingPointerStartX = event.clientX;
-            requestedRecordingKind = kind;
-            startRecording(kind);
-        });
-
-        button?.addEventListener('contextmenu', (event) => event.preventDefault());
-    }
-
-    window.addEventListener('pointermove', (event) => {
-        if (
-            event.pointerId !== activeRecordingPointerId
-            || recordingKind !== 'video_circle'
-            || !mediaRecorder
-            || mediaRecorder.state !== 'recording'
-        ) {
-            return;
-        }
-
-        const rawDistance = Math.max(0, recordingPointerStartX - event.clientX);
-        const distance = Math.max(0, rawDistance - cancelSwipeDeadZone);
-        const cancelSwipeDistance = getCancelSwipeDistance();
-        const progress = Math.min(distance / cancelSwipeDistance, 1);
-        if (circlePreview) {
-            circlePreview.style.setProperty('--cancel-progress', String(progress));
-            circlePreview.style.setProperty('--preview-shift', `${-Math.min(distance * 0.45, 100)}px`);
-        }
-
-        if (progress >= 1) {
-            activeRecordingPointerId = null;
-            stopRecording({ cancel: true });
-        }
-    }, { capture: true });
-
-    window.addEventListener('pointerup', (event) => {
-        if (event.pointerId !== activeRecordingPointerId) return;
-        event.preventDefault();
-        activeRecordingPointerId = null;
-        stopRecording();
-    }, { capture: true });
-
-    window.addEventListener('pointercancel', (event) => {
-        if (event.pointerId !== activeRecordingPointerId || event.pointerType === 'touch') return;
-        activeRecordingPointerId = null;
-        stopRecording();
-    }, { capture: true });
-
-    window.addEventListener('blur', () => {
-        if (activeRecordingPointerId === null || !mediaRecorder || mediaRecorder.state !== 'recording') return;
-        activeRecordingPointerId = null;
-        stopRecording();
-    });
-
-    document.addEventListener('touchend', (event) => {
-        if (activeRecordingPointerId === null) return;
-        const stillActive = Array.from(event.touches).some((touch) => touch.identifier === activeRecordingPointerId);
-        if (!stillActive) {
-            event.preventDefault();
-            activeRecordingPointerId = null;
-            stopRecording();
-        }
-    }, { passive: false, capture: true });
-
-    bindHoldToRecord(recordVoiceButton, 'voice');
-    bindHoldToRecord(recordCircleButton, 'video_circle');
-</script>
 {% endblock app_content %}
+
+{% block page_scripts %}
+    {{ block.super }}
+    <script src="{% static 'todo/js/chat.js' %}?v=20260618-5" defer></script>
+{% endblock page_scripts %}

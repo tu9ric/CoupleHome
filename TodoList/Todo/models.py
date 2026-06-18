@@ -106,6 +106,13 @@ class ChatMessage(models.Model):
         blank=True,
         related_name='chat_messages',
     )
+    reply_to = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='replies',
+    )
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -117,3 +124,9 @@ class ChatMessage(models.Model):
     @property
     def display_message(self):
         return decrypt_text(self.message)
+
+    @property
+    def reply_preview(self):
+        if not self.reply_to:
+            return ''
+        return self.reply_to.display_message or self.reply_to.get_attachment_type_display()

@@ -1,76 +1,50 @@
-from django.shortcuts import get_object_or_404, redirect
-from django.http import HttpResponse, JsonResponse
-from django.views.generic.list import ListView
-from django.views.generic.detail import DetailView
-from django.views.generic.edit import CreateView, UpdateView, DeleteView
-from django.views.generic import TemplateView
-from django.contrib.auth.views import LoginView
-from django.views.generic.edit import FormView
-from django.contrib.auth import login, logout, update_session_auth_hash
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import LoginView
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.views.generic import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    FormView,
+    ListView,
+    TemplateView,
+    UpdateView,
+)
+
 from .forms import (
-    CaseInsensitiveAuthenticationForm,
-    CaseInsensitiveUserCreationForm,
-    ChatMessageEditForm,
-    ChatMessageForm,
     AccountDeleteForm,
     AccountPasswordChangeForm,
     AccountProfileForm,
     AccountRecoveryForm,
     AddSpaceMemberForm,
+    CaseInsensitiveAuthenticationForm,
+    CaseInsensitiveUserCreationForm,
+    ChatMessageEditForm,
+    ChatMessageForm,
     CoupleEventForm,
     CoupleSpaceForm,
     SharedFileForm,
     SharedFileUpdateForm,
     TaskForm,
 )
-from .models import ChatMessage, CoupleEvent, CoupleSpace, SharedFile, Task
+from .mixins import AssignSpaceMixin, OwnedChatMessageMixin, SpaceQuerysetMixin
+from .models import ChatMessage, CoupleEvent, SharedFile, Task
 from .security import decrypt_bytes
+from .services import (
+    add_space_context,
+    get_active_space,
+    get_space_overview,
+    get_user_spaces,
+)
 
 
 User = get_user_model()
-
-
-QUESTION_PROMPTS = [
-    'What made us smile today?',
-    'What should we cook together this week?',
-    'Which shared plan needs a tiny next step?',
-    'What is one thing we can make easier for each other?',
-    'Which memory should we save in OurHome?',
-]
-
-
-def get_user_spaces(user):
-    return CoupleSpace.objects.filter(members=user)
-
-
-def get_active_space(request):
-    spaces = get_user_spaces(request.user)
-    space_id = request.session.get('active_space_id')
-    space = spaces.filter(id=space_id).first()
-
-    if space:
-        return space
-
-    space = spaces.first()
-    if not space:
-        space = CoupleSpace.objects.create(name=f"{request.user.username}'s home", owner=request.user)
-        space.members.add(request.user)
-
-    request.session['active_space_id'] = space.id
-    return space
-
-
-def add_space_context(request, context, active_nav):
-    active_space = get_active_space(request)
-    context['active_nav'] = active_nav
-    context['active_space'] = active_space
-    context['spaces'] = get_user_spaces(request.user)
-    return active_space
 
 
 class TaskList(LoginRequiredMixin, ListView):
@@ -106,10 +80,6 @@ class TaskList(LoginRequiredMixin, ListView):
         if status_filter not in ['active', 'completed']:
             status_filter = ''
 
-        context['count'] = user_tasks.filter(complete=False).count()
-        context['completed_count'] = user_tasks.filter(complete=True).count()
-        context['total_count'] = user_tasks.count()
-        context['visible_count'] = context['task'].count()
         context['search_input'] = self.request.GET.get('search-area', '').strip()
         context['status_filter'] = status_filter
         context['category_filter'] = self.request.GET.get('category', '').strip()
@@ -118,19 +88,9 @@ class TaskList(LoginRequiredMixin, ListView):
         ).exclude(
             category=''
         ).values_list('category', flat=True).distinct().order_by('category')
-        user_files = SharedFile.objects.filter(space=active_space)
-        upcoming_events = CoupleEvent.objects.filter(
-            space=active_space,
-            event_date__gte=timezone.localdate(),
-        )
-        context['file_count'] = user_files.count()
-        context['recent_files'] = user_files[:4]
-        context['favorite_files'] = user_files.filter(favorite=True)[:4]
-        context['event_count'] = upcoming_events.count()
-        context['events'] = upcoming_events[:4]
-        context['chat_messages'] = ChatMessage.objects.filter(space=active_space)[:5]
+        context.update(get_space_overview(active_space, chat_limit=5))
+        context['visible_count'] = context['task'].count()
         context['chat_form'] = ChatMessageForm()
-        context['question_prompt'] = QUESTION_PROMPTS[timezone.localdate().toordinal() % len(QUESTION_PROMPTS)]
         return context
 
 
@@ -140,22 +100,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         active_space = add_space_context(self.request, context, 'dashboard')
-        user_tasks = Task.objects.filter(space=active_space)
-        user_files = SharedFile.objects.filter(space=active_space)
-        upcoming_events = CoupleEvent.objects.filter(
-            space=active_space,
-            event_date__gte=timezone.localdate(),
-        )
-        context['count'] = user_tasks.filter(complete=False).count()
-        context['completed_count'] = user_tasks.filter(complete=True).count()
-        context['total_count'] = user_tasks.count()
-        context['file_count'] = user_files.count()
-        context['favorite_files'] = user_files.filter(favorite=True)[:4]
-        context['recent_files'] = user_files[:4]
-        context['event_count'] = upcoming_events.count()
-        context['events'] = upcoming_events[:4]
-        context['chat_messages'] = ChatMessage.objects.filter(space=active_space)[:4]
-        context['question_prompt'] = QUESTION_PROMPTS[timezone.localdate().toordinal() % len(QUESTION_PROMPTS)]
+        context.update(get_space_overview(active_space))
         return context
 
 
@@ -211,16 +156,23 @@ class ChatPage(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         active_space = add_space_context(self.request, context, 'chat')
-        latest_messages = ChatMessage.objects.filter(space=active_space).order_by('-id')[:50]
+        latest_messages = ChatMessage.objects.filter(
+            space=active_space,
+        ).select_related('user', 'reply_to', 'reply_to__user').order_by('-id')[:50]
         context['chat_messages'] = list(reversed(latest_messages))
-        latest_message = ChatMessage.objects.filter(space=active_space).order_by('-id').first()
-        context['latest_chat_message_id'] = latest_message.id if latest_message else 0
+        context['latest_chat_message_id'] = (
+            context['chat_messages'][-1].id
+            if context['chat_messages']
+            else 0
+        )
         context['chat_form'] = ChatMessageForm()
         return context
 
 
 class SettingsPage(LoginRequiredMixin, TemplateView):
     template_name = 'todo/settings.html'
+    allowed_themes = {'light', 'dark'}
+    allowed_languages = {'en', 'ru'}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -237,112 +189,97 @@ class SettingsPage(LoginRequiredMixin, TemplateView):
 
     def post(self, request, *args, **kwargs):
         action = request.POST.get('settings_action', 'preferences')
-        active_space = get_active_space(request)
+        handler = getattr(self, f'handle_{action}', self.handle_preferences)
+        return handler(request, get_active_space(request))
 
-        if action == 'create_space':
-            form = CoupleSpaceForm(request.POST)
-            if form.is_valid():
-                space = form.save(commit=False)
-                space.owner = request.user
-                space.save()
-                space.members.add(request.user)
-                request.session['active_space_id'] = space.id
-            return redirect('settings')
+    def handle_create_space(self, request, active_space):
+        form = CoupleSpaceForm(request.POST)
+        if form.is_valid():
+            space = form.save(commit=False)
+            space.owner = request.user
+            space.save()
+            space.members.add(request.user)
+            request.session['active_space_id'] = space.id
+        return redirect('settings')
 
-        if action == 'switch_space':
-            space = get_user_spaces(request.user).filter(id=request.POST.get('space_id')).first()
-            if space:
-                request.session['active_space_id'] = space.id
-            return redirect('settings')
+    def handle_switch_space(self, request, active_space):
+        space = get_user_spaces(request.user).filter(
+            id=request.POST.get('space_id'),
+        ).first()
+        if space:
+            request.session['active_space_id'] = space.id
+        return redirect('settings')
 
-        if action == 'add_member':
-            form = AddSpaceMemberForm(request.POST)
-            if form.is_valid():
-                username = form.cleaned_data['username']
-                user = User.objects.get(username__iexact=username)
-                active_space.members.add(user)
-            return redirect('settings')
+    def handle_add_member(self, request, active_space):
+        form = AddSpaceMemberForm(request.POST)
+        if form.is_valid():
+            user = User.objects.get(
+                username__iexact=form.cleaned_data['username'],
+            )
+            active_space.members.add(user)
+        return redirect('settings')
 
-        if action == 'remove_member':
-            if active_space.owner_id == request.user.id:
-                member = active_space.members.filter(id=request.POST.get('member_id')).first()
-                if member and member.id != active_space.owner_id:
-                    active_space.members.remove(member)
-            return redirect('settings')
+    def handle_remove_member(self, request, active_space):
+        if active_space.owner_id == request.user.id:
+            member = active_space.members.filter(
+                id=request.POST.get('member_id'),
+            ).exclude(id=active_space.owner_id).first()
+            if member:
+                active_space.members.remove(member)
+        return redirect('settings')
 
-        if action == 'profile':
-            form = AccountProfileForm(request.POST, instance=request.user)
-            if form.is_valid():
-                form.save()
-            return redirect('settings')
+    def handle_profile(self, request, active_space):
+        form = AccountProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+        return redirect('settings')
 
-        if action == 'password':
-            form = AccountPasswordChangeForm(request.user, request.POST)
-            if form.is_valid():
-                user = form.save()
-                update_session_auth_hash(request, user)
-            return redirect('settings')
+    def handle_password(self, request, active_space):
+        form = AccountPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)
+        return redirect('settings')
 
-        if action == 'deactivate_account':
-            form = AccountDeleteForm(request.user, request.POST)
-            if form.is_valid():
-                user = request.user
-                user.is_active = False
-                user.save(update_fields=['is_active'])
-                logout(request)
-                return redirect('login')
-            return redirect('settings')
+    def handle_deactivate_account(self, request, active_space):
+        form = AccountDeleteForm(request.user, request.POST)
+        if form.is_valid():
+            request.user.is_active = False
+            request.user.save(update_fields=['is_active'])
+            logout(request)
+            return redirect('login')
+        return redirect('settings')
 
+    def handle_preferences(self, request, active_space):
         theme = request.POST.get('theme', 'light')
         language = request.POST.get('language', 'en')
-
-        if theme not in ['light', 'dark']:
-            theme = 'light'
-        if language not in ['en', 'ru']:
-            language = 'en'
-
-        request.session['theme'] = theme
-        request.session['language'] = language
+        request.session['theme'] = theme if theme in self.allowed_themes else 'light'
+        request.session['language'] = language if language in self.allowed_languages else 'en'
         return redirect('settings')
 
 
-class TaskDetail(LoginRequiredMixin, DetailView):
+class TaskDetail(LoginRequiredMixin, SpaceQuerysetMixin, DetailView):
     model = Task
     context_object_name = 'task'
     template_name = 'todo/task.html'
 
-    def get_queryset(self):
-        return Task.objects.filter(space=get_active_space(self.request))
-
-
-class TaskCreate(LoginRequiredMixin, CreateView):
+class TaskCreate(LoginRequiredMixin, AssignSpaceMixin, CreateView):
     model = Task
     form_class = TaskForm
     success_url = reverse_lazy('task')
 
-    def form_valid(self, form):
-        form.instance.user = self.request.user
-        form.instance.space = get_active_space(self.request)
-        return super(TaskCreate, self).form_valid(form)
+    user_field = 'user'
 
 
-class TaskUpdate(LoginRequiredMixin, UpdateView):
+class TaskUpdate(LoginRequiredMixin, SpaceQuerysetMixin, UpdateView):
     model = Task
     form_class = TaskForm
     success_url = reverse_lazy('task')
 
-    def get_queryset(self):
-        return Task.objects.filter(space=get_active_space(self.request))
-
-
-class TaskDelete(LoginRequiredMixin, DeleteView):
+class TaskDelete(LoginRequiredMixin, SpaceQuerysetMixin, DeleteView):
     model = Task
     context_object_name = 'task'
     success_url = reverse_lazy('task')
-
-    def get_queryset(self):
-        return Task.objects.filter(space=get_active_space(self.request))
-
 
 class CustomLoginView(LoginView):
     template_name = 'todo/login.html'
@@ -381,80 +318,72 @@ class AccountRecoveryPage(FormView):
         return super().form_valid(form)
 
 
-class SharedFileCreate(LoginRequiredMixin, CreateView):
+class SharedFileCreate(LoginRequiredMixin, AssignSpaceMixin, CreateView):
     model = SharedFile
     form_class = SharedFileForm
     template_name = 'todo/shared_file_form.html'
     success_url = reverse_lazy('files')
 
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        form.instance.space = get_active_space(self.request)
-        return super().form_valid(form)
+    user_field = 'owner'
 
 
-class SharedFileDelete(LoginRequiredMixin, DeleteView):
+class SharedFileDelete(LoginRequiredMixin, SpaceQuerysetMixin, DeleteView):
     model = SharedFile
     context_object_name = 'file'
     template_name = 'todo/shared_file_confirm_delete.html'
     success_url = reverse_lazy('files')
 
-    def get_queryset(self):
-        return SharedFile.objects.filter(space=get_active_space(self.request))
-
-
-class SharedFileUpdate(LoginRequiredMixin, UpdateView):
+class SharedFileUpdate(LoginRequiredMixin, SpaceQuerysetMixin, UpdateView):
     model = SharedFile
     form_class = SharedFileUpdateForm
     template_name = 'todo/shared_file_edit_form.html'
     success_url = reverse_lazy('files')
 
-    def get_queryset(self):
-        return SharedFile.objects.filter(space=get_active_space(self.request))
-
-
-class CoupleEventCreate(LoginRequiredMixin, CreateView):
+class CoupleEventCreate(LoginRequiredMixin, AssignSpaceMixin, CreateView):
     model = CoupleEvent
     form_class = CoupleEventForm
     template_name = 'todo/event_form.html'
     success_url = reverse_lazy('events')
 
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        form.instance.space = get_active_space(self.request)
-        return super().form_valid(form)
+    user_field = 'owner'
 
 
-class ChatMessageCreate(LoginRequiredMixin, CreateView):
+class ChatMessageCreate(LoginRequiredMixin, AssignSpaceMixin, CreateView):
     model = ChatMessage
     form_class = ChatMessageForm
     success_url = reverse_lazy('chat')
 
+    user_field = 'user'
+
     def form_valid(self, form):
-        form.instance.user = self.request.user
-        form.instance.space = get_active_space(self.request)
-        return super().form_valid(form)
+        active_space = get_active_space(self.request)
+        reply_to_id = form.cleaned_data.get('reply_to')
+        if reply_to_id:
+            form.instance.reply_to = ChatMessage.objects.filter(
+                id=reply_to_id,
+                space=active_space,
+            ).first()
+
+        response = super().form_valid(form)
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'id': self.object.id,
+                'html': render_chat_message(self.request, self.object),
+            }, status=201)
+        return response
 
 
-class ChatMessageUpdate(LoginRequiredMixin, UpdateView):
+class ChatMessageUpdate(LoginRequiredMixin, OwnedChatMessageMixin, UpdateView):
     model = ChatMessage
     form_class = ChatMessageEditForm
     template_name = 'todo/chat_message_form.html'
     success_url = reverse_lazy('chat')
 
-    def get_queryset(self):
-        return ChatMessage.objects.filter(space=get_active_space(self.request), user=self.request.user)
-
-
-class ChatMessageDelete(LoginRequiredMixin, DeleteView):
+class ChatMessageDelete(LoginRequiredMixin, OwnedChatMessageMixin, DeleteView):
     model = ChatMessage
     context_object_name = 'message'
     template_name = 'todo/chat_message_confirm_delete.html'
     success_url = reverse_lazy('chat')
-
-    def get_queryset(self):
-        return ChatMessage.objects.filter(space=get_active_space(self.request), user=self.request.user)
-
 
 @login_required
 def download_chat_attachment(request, pk):
@@ -475,8 +404,9 @@ def chat_notifications(request):
     except ValueError:
         after_id = 0
 
+    active_space = get_active_space(request)
     messages = ChatMessage.objects.filter(
-        space=get_active_space(request),
+        space=active_space,
         id__gt=after_id,
     ).exclude(user=request.user).order_by('id')[:10]
 
@@ -493,11 +423,48 @@ def chat_notifications(request):
             'attachment_type': message.attachment_type,
         })
 
-    latest_message = ChatMessage.objects.filter(space=get_active_space(request)).order_by('-id').first()
+    latest_message = ChatMessage.objects.filter(space=active_space).order_by('-id').first()
     return JsonResponse({
         'latest_id': latest_message.id if latest_message else after_id,
         'messages': payload,
     })
+
+
+@login_required
+def chat_updates(request):
+    try:
+        after_id = max(int(request.GET.get('after', 0)), 0)
+    except (TypeError, ValueError):
+        after_id = 0
+
+    messages = list(
+        ChatMessage.objects.filter(
+            space=get_active_space(request),
+            id__gt=after_id,
+        ).select_related('user', 'reply_to', 'reply_to__user').order_by('id')[:50]
+    )
+    return JsonResponse({
+        'latest_id': messages[-1].id if messages else after_id,
+        'messages': [
+            {
+                'id': message.id,
+                'html': render_chat_message(request, message),
+                'is_own': message.user_id == request.user.id,
+                'author': message.user.username,
+                'message': message.display_message or message.get_attachment_type_display(),
+                'created_at': message.created.isoformat(),
+            }
+            for message in messages
+        ],
+    })
+
+
+def render_chat_message(request, message):
+    return render_to_string(
+        'todo/_chat_message.html',
+        {'message': message},
+        request=request,
+    )
 
 
 @login_required

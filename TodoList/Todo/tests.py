@@ -412,6 +412,8 @@ class CoupleHomeFeatureTests(TestCase):
 
         self.assertContains(response, 'chat-bubble-own')
         self.assertContains(response, 'chat-bubble-partner')
+        self.assertContains(response, 'data-own-message="true"')
+        self.assertContains(response, 'data-message-menu')
 
     def test_chat_renders_old_messages_before_new_messages(self):
         space = CoupleSpace.objects.create(name='Chronological chat', owner=self.user)
@@ -440,6 +442,80 @@ class CoupleHomeFeatureTests(TestCase):
         self.assertEqual(len(payload['messages']), 1)
         self.assertEqual(payload['messages'][0]['author'], 'partner')
         self.assertEqual(payload['messages'][0]['message'], 'Incoming note')
+
+    def test_chat_message_can_reply_to_message_in_same_space(self):
+        space = CoupleSpace.objects.create(name='Reply chat', owner=self.user)
+        space.members.add(self.user)
+        original = ChatMessage.objects.create(
+            user=self.user,
+            space=space,
+            message='Original message',
+        )
+        session = self.client.session
+        session['active_space_id'] = space.id
+        session.save()
+
+        response = self.client.post(reverse('chat-send'), {
+            'message': 'Reply message',
+            'attachment_type': ChatMessage.TEXT,
+            'reply_to': original.id,
+        })
+
+        self.assertRedirects(response, reverse('chat'))
+        reply = ChatMessage.objects.get(message__contains='fernet:')
+        self.assertEqual(reply.reply_to, original)
+
+    def test_chat_message_cannot_reply_to_message_from_another_space(self):
+        other_user = User.objects.create_user(username='reply-other', password='pass12345')
+        other_space = CoupleSpace.objects.create(name='Other reply chat', owner=other_user)
+        original = ChatMessage.objects.create(
+            user=other_user,
+            space=other_space,
+            message='Private message',
+        )
+
+        self.client.post(reverse('chat-send'), {
+            'message': 'Invalid reply',
+            'attachment_type': ChatMessage.TEXT,
+            'reply_to': original.id,
+        })
+
+        self.assertIsNone(ChatMessage.objects.get(user=self.user).reply_to)
+
+    def test_chat_updates_return_rendered_messages_after_id(self):
+        space = CoupleSpace.objects.create(name='Live chat', owner=self.user)
+        space.members.add(self.user)
+        first = ChatMessage.objects.create(user=self.user, space=space, message='First')
+        second = ChatMessage.objects.create(user=self.user, space=space, message='Second')
+        session = self.client.session
+        session['active_space_id'] = space.id
+        session.save()
+
+        response = self.client.get(reverse('chat-updates'), {'after': first.id})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['latest_id'], second.id)
+        self.assertEqual(len(payload['messages']), 1)
+        self.assertIn('data-message-id', payload['messages'][0]['html'])
+        self.assertIn('chat-message-time', payload['messages'][0]['html'])
+        self.assertEqual(payload['messages'][0]['author'], self.user.username)
+        self.assertIn('created_at', payload['messages'][0])
+
+    def test_ajax_chat_send_returns_rendered_message(self):
+        response = self.client.post(
+            reverse('chat-send'),
+            {
+                'message': 'Instant message',
+                'attachment_type': ChatMessage.TEXT,
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertIn('Instant message', payload['html'])
+        self.assertEqual(payload['id'], ChatMessage.objects.get(user=self.user).id)
 
     def test_photo_message_can_be_sent_and_rendered(self):
         response = self.client.post(reverse('chat-send'), {

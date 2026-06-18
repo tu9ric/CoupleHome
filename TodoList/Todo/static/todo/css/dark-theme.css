@@ -1,0 +1,177 @@
+    .theme-dark {
+        background: #111816;
+        color: #eaf2ee;
+    }
+
+    .theme-dark .container,
+    .theme-dark .app-layout,
+    .theme-dark .app-main,
+    .theme-dark .home-shell {
+        background: #18211f;
+    }
+
+    .theme-dark .hub-panel,
+    .theme-dark .stat-card,
+    .theme-dark .task-card,
+    .theme-dark .empty-state,
+    .theme-dark .file-card,
+    .theme-dark .mini-item,
+    .theme-dark .chat-bubble,
+    .theme-dark .event-row {
+        background: #202b28;
+        border-color: #34443f;
+        color: #eaf2ee;
+    }
+
+    .theme-dark .chat-bubble-own {
+        background: #203633;
+        border-color: #3f6760;
+    }
+
+    .theme-dark .mode-header p:not(.eyebrow),
+    .theme-dark .muted-text,
+    .theme-dark .stat-label,
+    .theme-dark .file-card p,
+    .theme-dark .task-card p,
+    .theme-dark .event-row p,
+    .theme-dark .chat-bubble small,
+    .theme-dark .task-status,
+    .theme-dark .task-meta,
+    .theme-dark .record-status {
+        color: #aebfba;
+    }
+
+    .theme-dark select,
+    .theme-dark input[type=text],
+    .theme-dark input[type=email],
+    .theme-dark input[type=password],
+    .theme-dark textarea {
+        background: #17201e;
+        border-color: #3b4d47;
+        color: #eaf2ee;
+    }
+
+    .theme-dark .muted-action,
+    .theme-dark .mini-action,
+    .theme-dark .segmented-control,
+    .theme-dark .chat-icon-button {
+        background: #17201e;
+        border-color: #3b4d47;
+        color: #dcefeb;
+    }
+
+    .theme-dark .chat-send-button {
+        background: #2f6f73;
+        border-color: #2f6f73;
+        color: #fff;
+    }
+
+    .theme-dark .question-card {
+        background: #2c281d;
+        border-color: #594829;
+    }
+
+    .theme-dark .filter-panel,
+    .theme-dark .inline-filter,
+    .theme-dark .files-filter {
+        background: transparent;
+        border-color: #34443f;
+    }
+
+    .theme-dark .filter-panel label,
+    .theme-dark .filter-panel label span {
+        background: transparent;
+        color: #dcefeb;
+    }
+
+    .theme-dark .category-pill,
+    .theme-dark .muted-pill {
+        background: #17201e;
+        border-color: #3b4d47;
+        color: #dcefeb;
+    }
+
+    .theme-dark .member-item {
+        background: #17201e;
+        border-color: #3b4d47;
+        color: #dcefeb;
+    }
+
+    .theme-dark .member-item small {
+        color: #aebfba;
+    }
+
+    .theme-dark .member-remove-button {
+        border-color: #754848;
+        color: #ff8b8b;
+    }
+
+    .theme-dark .favorite-pill {
+        background: #2c281d;
+        border-color: #594829;
+        color: #f0d59c;
+    }
+
+    .theme-dark .task-actions {
+        border-top-color: #34443f;
+    }
+
+    .theme-dark .task-actions a {
+        color: #7fc7c1;
+    }
+
+    .theme-dark .task-actions .danger-link {
+        color: #ff7777;
+    }
+
+    .theme-dark .message-actions a {
+        color: #7fc7c1;
+    }
+
+    .theme-dark .message-reply-button {
+        color: #7fc7c1;
+    }
+
+    .theme-dark .message-actions .danger-link {
+        color: #ff7777;
+    }
+
+    .theme-dark .danger-action {
+        color: #ff7777;
+    }
+
+    .theme-dark .danger-button {
+        background: #9f3a3a;
+        border-color: #9f3a3a;
+    }
+
+    .theme-dark .danger-zone {
+        border-color: #6b3a3a;
+    }
+
+    .theme-dark .chat-reply-preview,
+    .theme-dark .chat-reply-quote {
+        background: rgba(116, 190, 181, 0.1);
+    }
+
+    .theme-dark .message-context-menu {
+        background: #1a2622;
+        border-color: #34443f;
+    }
+
+    .theme-dark .message-context-menu button,
+    .theme-dark .message-context-menu a {
+        color: #eaf2ee;
+    }
+
+    .theme-dark .message-context-menu button:hover,
+    .theme-dark .message-context-menu button:focus-visible,
+    .theme-dark .message-context-menu a:hover,
+    .theme-dark .message-context-menu a:focus-visible {
+        background: #24332e;
+    }
+
+    .theme-dark .message-context-menu .danger-link {
+        color: #ff7777;
+    }
+

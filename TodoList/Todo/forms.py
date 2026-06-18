@@ -12,6 +12,17 @@ User = get_user_model()
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 
 
+def validate_upload_size(upload, label='File'):
+    if upload.size > MAX_UPLOAD_SIZE:
+        raise ValidationError(f'{label} size must be 50 MB or less.')
+    return upload
+
+
+def validate_content_type(upload, expected_prefix, message):
+    if upload and not upload.content_type.startswith(expected_prefix):
+        raise ValidationError(message)
+
+
 class CaseInsensitiveAuthenticationForm(AuthenticationForm):
     def clean_username(self):
         username = self.cleaned_data.get('username')
@@ -132,10 +143,7 @@ class SharedFileForm(forms.ModelForm):
         }
 
     def clean_upload(self):
-        upload = self.cleaned_data['upload']
-        if upload.size > MAX_UPLOAD_SIZE:
-            raise ValidationError('File size must be 50 MB or less.')
-        return upload
+        return validate_upload_size(self.cleaned_data['upload'])
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -173,6 +181,7 @@ class CoupleEventForm(forms.ModelForm):
 
 class ChatMessageForm(forms.ModelForm):
     upload = forms.FileField(label='Attachment', required=False)
+    reply_to = forms.IntegerField(required=False, widget=forms.HiddenInput)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -204,15 +213,26 @@ class ChatMessageForm(forms.ModelForm):
             raise ValidationError('Attach a file for this message type.')
         if attachment_type == ChatMessage.TEXT and not message:
             raise ValidationError('Write a message or choose an attachment type.')
-        if upload and upload.size > MAX_UPLOAD_SIZE:
-            raise ValidationError('Attachment size must be 50 MB or less.')
+        if upload:
+            validate_upload_size(upload, label='Attachment')
 
-        if upload and attachment_type == ChatMessage.PHOTO and not upload.content_type.startswith('image/'):
-            raise ValidationError('Photo messages must use an image file.')
-        if upload and attachment_type == ChatMessage.VOICE and not upload.content_type.startswith('audio/'):
-            raise ValidationError('Voice messages must use an audio file.')
-        if upload and attachment_type == ChatMessage.VIDEO_CIRCLE and not upload.content_type.startswith('video/'):
-            raise ValidationError('Video circles must use a video file.')
+        validators = {
+            ChatMessage.PHOTO: (
+                'image/',
+                'Photo messages must use an image file.',
+            ),
+            ChatMessage.VOICE: (
+                'audio/',
+                'Voice messages must use an audio file.',
+            ),
+            ChatMessage.VIDEO_CIRCLE: (
+                'video/',
+                'Video circles must use a video file.',
+            ),
+        }
+        if upload and attachment_type in validators:
+            expected_prefix, error_message = validators[attachment_type]
+            validate_content_type(upload, expected_prefix, error_message)
 
         return cleaned_data
 

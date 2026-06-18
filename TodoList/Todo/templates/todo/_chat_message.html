@@ -1,0 +1,37 @@
+<div
+    class="chat-bubble {% if message.user == request.user %}chat-bubble-own{% else %}chat-bubble-partner{% endif %}"
+    data-message-id="{{ message.id }}"
+    data-reply-author="{{ message.user.username }}"
+    data-reply-text="{{ message.display_message|default:message.get_attachment_type_display|truncatechars:120 }}"
+    {% if message.user == request.user %}
+        data-own-message="true"
+        {% if message.display_message %}data-edit-url="{% url 'chat-message-edit' message.id %}"{% endif %}
+        data-delete-url="{% url 'chat-message-delete' message.id %}"
+    {% endif %}
+>
+    <strong class="chat-message-author">{{ message.user|title }}</strong>
+    {% if message.reply_to %}
+        <button class="chat-reply-quote" type="button" data-scroll-to-message="{{ message.reply_to_id }}">
+            <strong>{{ message.reply_to.user|title }}</strong>
+            <span>{{ message.reply_preview|truncatechars:120 }}</span>
+        </button>
+    {% endif %}
+    {% if message.display_message %}
+        <p class="chat-message-text">{{ message.display_message }}</p>
+    {% endif %}
+    {% if message.data and message.attachment_type == 'photo' %}
+        <img class="chat-photo" src="{% url 'chat-attachment' message.id %}" alt="{{ message.file_name }}">
+    {% elif message.data and message.attachment_type == 'voice' %}
+        <audio class="chat-audio" controls src="{% url 'chat-attachment' message.id %}"></audio>
+    {% elif message.data and message.attachment_type == 'video_circle' %}
+        <button class="video-circle-trigger" type="button" data-video-src="{% url 'chat-attachment' message.id %}">
+            <video muted playsinline preload="metadata" src="{% url 'chat-attachment' message.id %}"></video>
+            <span>Play</span>
+        </button>
+    {% endif %}
+    <small class="chat-message-meta">
+        <time class="chat-message-time" datetime="{{ message.created|date:'c' }}">
+            {{ message.created|date:"M j, H:i" }}
+        </time>
+    </small>
+</div>

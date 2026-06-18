@@ -1,4 +1,5 @@
 {% extends 'todo/app_shell.html' %}
+{% load static %}
 
 {% block app_content %}
 <section class="mode-header">
@@ -183,12 +184,9 @@
     </div>
 </section>
 
-<script>
-    const settingsForm = document.querySelector('[data-autosubmit-settings]');
-    if (settingsForm) {
-        settingsForm.addEventListener('change', () => {
-            settingsForm.requestSubmit();
-        });
-    }
-</script>
 {% endblock app_content %}
+
+{% block page_scripts %}
+    {{ block.super }}
+    <script src="{% static 'todo/js/settings.js' %}" defer></script>
+{% endblock page_scripts %}

@@ -1,5 +1,6 @@
 import base64
 import hashlib
+from functools import lru_cache
 
 from cryptography.fernet import Fernet
 from django.conf import settings
@@ -9,6 +10,7 @@ TEXT_PREFIX = 'fernet:'
 BYTES_PREFIX = b'fernet:'
 
 
+@lru_cache(maxsize=1)
 def _fernet():
     digest = hashlib.sha256(settings.SECRET_KEY.encode('utf-8')).digest()
     key = base64.urlsafe_b64encode(digest)
