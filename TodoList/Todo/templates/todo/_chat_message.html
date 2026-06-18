@@ -25,7 +25,13 @@
         <audio class="chat-audio" controls src="{% url 'chat-attachment' message.id %}"></audio>
     {% elif message.data and message.attachment_type == 'video_circle' %}
         <button class="video-circle-trigger" type="button" data-video-src="{% url 'chat-attachment' message.id %}">
-            <video muted playsinline preload="metadata" src="{% url 'chat-attachment' message.id %}"></video>
+            <video
+                muted
+                loop
+                playsinline
+                preload="auto"
+                src="{% url 'chat-attachment' message.id %}"
+            ></video>
             <span>Play</span>
         </button>
     {% endif %}

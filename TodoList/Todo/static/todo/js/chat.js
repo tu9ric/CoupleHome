@@ -40,6 +40,25 @@ const messageInput = document.querySelector('textarea[name="message"]');
     const cancelSwipeDeadZone = 24;
     let chatUpdateInProgress = false;
 
+    const recordingFormats = {
+        voice: [
+            { mimeType: 'audio/mp4', extension: 'm4a' },
+            { mimeType: 'audio/webm;codecs=opus', extension: 'webm' },
+            { mimeType: 'audio/webm', extension: 'webm' },
+            { mimeType: 'audio/ogg;codecs=opus', extension: 'ogg' },
+        ],
+        video_circle: [
+            { mimeType: 'video/mp4', extension: 'mp4' },
+            { mimeType: 'video/webm;codecs=vp8,opus', extension: 'webm' },
+            { mimeType: 'video/webm', extension: 'webm' },
+        ],
+    };
+
+    function getSupportedRecordingFormat(kind) {
+        const formats = recordingFormats[kind] || [];
+        return formats.find(({ mimeType }) => MediaRecorder.isTypeSupported(mimeType)) || null;
+    }
+
     function getCancelSwipeDistance() {
         return Math.max(150, Math.min(window.innerWidth * 0.48, 260));
     }
@@ -216,9 +235,9 @@ const messageInput = document.querySelector('textarea[name="message"]');
                 return;
             }
             recordedChunks = [];
-            const preferredMimeType = kind === 'voice' ? 'audio/webm' : 'video/webm';
-            const options = MediaRecorder.isTypeSupported(preferredMimeType)
-                ? { mimeType: preferredMimeType }
+            const recordingFormat = getSupportedRecordingFormat(kind);
+            const options = recordingFormat
+                ? { mimeType: recordingFormat.mimeType }
                 : {};
             mediaRecorder = new MediaRecorder(recordingStream, options);
             mediaRecorder.addEventListener('dataavailable', (event) => {
@@ -295,8 +314,12 @@ const messageInput = document.querySelector('textarea[name="message"]');
         }
 
         const kind = recordingKind;
-        const mimeType = mediaRecorder?.mimeType || (kind === 'voice' ? 'audio/webm' : 'video/webm');
-        const extension = mimeType.includes('ogg') ? 'ogg' : 'webm';
+        const recordingFormat = getSupportedRecordingFormat(kind);
+        const mimeType = mediaRecorder?.mimeType
+            || recordingFormat?.mimeType
+            || (kind === 'voice' ? 'audio/mp4' : 'video/mp4');
+        const extension = recordingFormat?.extension
+            || (mimeType.includes('mp4') ? (kind === 'voice' ? 'm4a' : 'mp4') : 'webm');
         const blob = new Blob(recordedChunks, { type: mimeType });
         const formData = new FormData(chatForm);
         formData.set('attachment_type', kind);
@@ -458,7 +481,34 @@ const messageInput = document.querySelector('textarea[name="message"]');
         });
 
         formatLocalTimes(chatFeed);
+        observeVideoCirclePreviews(chatFeed);
         if (nearBottom) scrollChatToBottom();
+    }
+
+    const videoPreviewObserver = 'IntersectionObserver' in window
+        ? new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                const video = entry.target;
+                if (entry.isIntersecting) {
+                    video.play().catch(() => {});
+                } else {
+                    video.pause();
+                }
+            });
+        }, { root: chatFeed, threshold: 0.35 })
+        : null;
+
+    function observeVideoCirclePreviews(root = document) {
+        root.querySelectorAll('.video-circle-trigger video:not([data-preview-ready])').forEach((video) => {
+            video.dataset.previewReady = 'true';
+            video.muted = true;
+            video.playsInline = true;
+            if (videoPreviewObserver) {
+                videoPreviewObserver.observe(video);
+            } else {
+                video.play().catch(() => {});
+            }
+        });
     }
 
     function resetComposer() {
@@ -665,4 +715,5 @@ const messageInput = document.querySelector('textarea[name="message"]');
     });
 
     formatLocalTimes();
+    observeVideoCirclePreviews();
     pollChatUpdates();
