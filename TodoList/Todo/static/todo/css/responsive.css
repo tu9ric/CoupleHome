@@ -44,6 +44,28 @@
             padding: 0;
         }
 
+        body,
+        .app-layout,
+        .app-layout button,
+        .app-layout a,
+        .app-layout label,
+        .app-layout small,
+        .app-layout strong,
+        .app-layout span {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .chat-message-text,
+        .chat-message-text *,
+        .chat-message-field textarea,
+        .chat-reply-quote span {
+            -webkit-touch-callout: default;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
         .container {
             border: 0;
             border-radius: 0;

@@ -374,6 +374,7 @@ const messageInput = document.querySelector('textarea[name="message"]');
 
         button?.addEventListener('pointerdown', (event) => {
             event.preventDefault();
+            window.getSelection()?.removeAllRanges();
             if (activeRecordingPointerId !== null) return;
             activeRecordingPointerId = event.pointerId;
             recordingPointerStartX = event.clientX;
@@ -383,6 +384,14 @@ const messageInput = document.querySelector('textarea[name="message"]');
 
         button?.addEventListener('contextmenu', (event) => event.preventDefault());
     }
+
+    document.addEventListener('selectionchange', () => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) return;
+        const anchorElement = selection.anchorNode?.parentElement;
+        if (anchorElement?.closest('.chat-message-text, .chat-message-field')) return;
+        selection.removeAllRanges();
+    });
 
     window.addEventListener('pointermove', (event) => {
         if (
